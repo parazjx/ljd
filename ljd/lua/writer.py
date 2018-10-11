@@ -50,12 +50,24 @@ class Visitor(traverse.Visitor):
 
         self.print_queue = []
 
+        self._current_line = 1
+
         self._visited_nodes = [set()]
         self._states = [_State()]
 
     # ##
 
-    def _start_statement(self, statement):
+    def _start_statement(self, statement, node):
+
+        line = -1
+        if hasattr(node, "_line"):
+            line = node._line
+        elif hasattr(node, "_first_line"):
+            line = node._first_line
+
+        self._advance_to_line(line)
+
+
         assert self._state().current_statement == STATEMENT_NONE
         self._state().current_statement = statement
         self.print_queue.append((CMD_START_STATEMENT, statement))
@@ -64,9 +76,16 @@ class Visitor(traverse.Visitor):
         assert statement == self._state().current_statement
         self._state().current_statement = STATEMENT_NONE
         self.print_queue.append((CMD_END_STATEMENT, statement))
+        self._current_line += 1
 
     def _end_line(self):
-        self.print_queue.append((CMD_END_LINE,))
+        pass
+
+    def _advance_to_line(self, line):
+        #assert line >= self._current_line
+        while self._current_line < line:
+            self.print_queue.append((CMD_END_LINE,))
+            self._current_line += 1
 
     def _start_block(self):
         self.print_queue.append((CMD_START_BLOCK,))
@@ -92,7 +111,7 @@ class Visitor(traverse.Visitor):
         is_statement = self._state().function_name is not None
 
         if is_statement:
-            self._start_statement(STATEMENT_FUNCTION)
+            self._start_statement(STATEMENT_FUNCTION, node)
 
             if self._state().function_local:
                 self._write("local ")
@@ -218,13 +237,14 @@ class Visitor(traverse.Visitor):
 
                     return
 
-        if is_local:
-            self._write("local ")
 
         if src_is_function:
-            self._start_statement(STATEMENT_FUNCTION)
+            self._start_statement(STATEMENT_FUNCTION, node)
         else:
-            self._start_statement(STATEMENT_ASSIGNMENT)
+            self._start_statement(STATEMENT_ASSIGNMENT, node)
+
+        if is_local:
+            self._write("local ")
 
         self._visit(node.destinations)
 
@@ -498,7 +518,7 @@ class Visitor(traverse.Visitor):
         is_statement = self._state().current_statement == STATEMENT_NONE
 
         if is_statement:
-            self._start_statement(STATEMENT_FUNCTION_CALL)
+            self._start_statement(STATEMENT_FUNCTION_CALL, node)
 
         # We are going to modify this list so we can remove the first
         # argument
@@ -546,13 +566,13 @@ class Visitor(traverse.Visitor):
     # ##
 
     def visit_if(self, node):
-        self._start_statement(STATEMENT_IF)
+        self._start_statement(STATEMENT_IF, node)
 
         self._write("if ")
 
         self._visit(node.expression)
 
-        self._write(" then")
+        self._write(" then ")
 
         self._end_line()
 
@@ -574,6 +594,8 @@ class Visitor(traverse.Visitor):
         self._end_statement(STATEMENT_IF)
 
     def visit_elseif(self, node):
+        self._advance_to_line(node._first_line)
+
         self._write("elseif ")
 
         self._visit(node.expression)
@@ -676,7 +698,7 @@ class Visitor(traverse.Visitor):
     # ##
 
     def visit_return(self, node):
-        self._start_statement(STATEMENT_RETURN)
+        self._start_statement(STATEMENT_RETURN, node)
 
         if len(node.returns.contents) > 0:
             self._write("return ")
@@ -688,7 +710,7 @@ class Visitor(traverse.Visitor):
         self._end_statement(STATEMENT_RETURN)
 
     def visit_break(self, node):
-        self._start_statement(STATEMENT_BREAK)
+        self._start_statement(STATEMENT_BREAK, node)
 
         self._write("break")
 
@@ -697,7 +719,7 @@ class Visitor(traverse.Visitor):
     # ##
 
     def visit_while(self, node):
-        self._start_statement(STATEMENT_WHILE)
+        self._start_statement(STATEMENT_WHILE, node)
 
         self._write("while ")
         self._visit(node.expression)
@@ -711,7 +733,7 @@ class Visitor(traverse.Visitor):
         self._end_statement(STATEMENT_WHILE)
 
     def visit_repeat_until(self, node):
-        self._start_statement(STATEMENT_REPEAT_UNTIL)
+        self._start_statement(STATEMENT_REPEAT_UNTIL, node)
 
         self._write("repeat")
         self._end_line()
@@ -724,7 +746,7 @@ class Visitor(traverse.Visitor):
         self._end_statement(STATEMENT_REPEAT_UNTIL)
 
     def visit_numeric_for(self, node):
-        self._start_statement(STATEMENT_NUMERIC_FOR)
+        self._start_statement(STATEMENT_NUMERIC_FOR, node)
 
         self._write("for ")
         self._visit(node.variable)
@@ -742,7 +764,7 @@ class Visitor(traverse.Visitor):
         self._end_statement(STATEMENT_NUMERIC_FOR)
 
     def visit_iterator_for(self, node):
-        self._start_statement(STATEMENT_ITERATOR_FOR)
+        self._start_statement(STATEMENT_ITERATOR_FOR, node)
 
         self._write("for ")
         self._visit(node.identifiers)
@@ -878,7 +900,8 @@ def _process_queue(fd, queue):
                 if next_cmd[1] != cmd[1] \
                         or cmd[1] >= STATEMENT_IF \
                         or next_cmd[1] >= STATEMENT_IF:
-                    wrapped_write(fd, "\n")
+                    #wrapped_write(fd, "\n")
+                    pass
         elif cmd[0] == CMD_END_LINE:
             wrapped_write(fd, "\n")
             line_broken = True

@@ -602,6 +602,7 @@ def _unwarp_logical_expression(start, end, body):
     dst = copy.deepcopy(slot)
 
     assignment = nodes.Assignment()
+    setattr(assignment, "_line", start._first_line)
     assignment.destinations.contents.append(dst)
     assignment.expressions.contents.append(expression)
 
@@ -1070,6 +1071,8 @@ def _unwarp_if_statement(start, body, end, topmost_end):
                                                      topmost_end)
 
     node = nodes.If()
+    setattr(node, "_first_line", start._last_line)
+    setattr(node, "_last_line", end._last_line)
     node.expression = expression
 
     # has an else branch
@@ -1265,6 +1268,7 @@ def _unwarp_loops(blocks, repeat_until):
         body = loop.statements.contents
 
         block = nodes.Block()
+        setattr(block, "_first_line", body[0]._first_line)
         block.first_address = body[0].first_address
         block.last_address = body[-1].last_address
         block.index = start.index + 1
@@ -1380,6 +1384,7 @@ def _unwarp_loop(start, end, body):
         assert last.warp.target == start
 
         loop = nodes.IteratorFor()
+        setattr(loop, "_first_line", start._first_line)
         loop.statements.contents = body
         loop.identifiers = start.warp.variables
         loop.expressions = start.warp.controls
@@ -1392,6 +1397,7 @@ def _unwarp_loop(start, end, body):
         assert last.warp.target == start
 
         loop = nodes.NumericFor()
+        setattr(loop, "_first_line", start._first_line)
         loop.statements.contents = body
         loop.variable = start.warp.index
         loop.expressions = start.warp.controls
@@ -1406,6 +1412,7 @@ def _unwarp_loop(start, end, body):
         # while true
         if _is_flow(start.warp):
             loop = nodes.While()
+            setattr(loop, "_first_line", start._first_line)
             loop.expression = nodes.Primitive()
             loop.expression.type = nodes.Primitive.T_TRUE
 
@@ -1441,6 +1448,7 @@ def _unwarp_loop(start, end, body):
             # If something jumps to the start (instead of the end)
             # - that's a nested if
             loop = nodes.While()
+            setattr(loop, "_first_line", start._first_line)
             loop.expression = expression
             loop.statements.contents = body
 
@@ -1479,7 +1487,9 @@ def _unwarp_loop(start, end, body):
             expression.pop(0)
             if len(body[-1].contents) == 1 and isinstance(body[-1].contents, nodes.NoOp):
                 body[-1].contents = []
-            body[-1].contents.append(nodes.Break())
+            break_node = nodes.Break()
+            setattr(break_node, "_line", start._first_line)
+            body[-1].contents.append(break_node)
 
         false = body[0]
         # Don't use end as it could be broken by a previous
@@ -1487,6 +1497,7 @@ def _unwarp_loop(start, end, body):
         true = expression[-1].warp.true_target
 
         loop = nodes.RepeatUntil()
+        setattr(loop, "_first_line", start._first_line)
         loop.expression = _compile_expression(expression, None,
                                               true, false)
 
@@ -1509,6 +1520,8 @@ def _unwarp_loop(start, end, body):
 
 def _create_next_block(original):
     block = nodes.Block()
+    setattr(block, "_first_line", original._last_line)
+    setattr(block, "_last_line", original._last_line)
     block.first_address = original.last_address + 1
     block.last_address = block.first_address
     block.index = original.index + 1
@@ -1626,13 +1639,16 @@ def _unwarp_breaks(start, blocks, next_block):
             patched.append(block)
             patched.append(new_block)
 
+            old_block = block
             block = new_block
         else:
             patched.append(block)
 
         if len(block.contents) == 1 and isinstance(block.contents[0], nodes.NoOp):
             block.contents = []
-        block.contents.append(nodes.Break())
+        break_node = nodes.Break()
+        setattr(break_node, "_line", block._first_line)
+        block.contents.append(break_node)
 
         if i + 1 == len(blocks):
             _set_end(block)
