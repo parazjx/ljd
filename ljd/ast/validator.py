@@ -25,18 +25,18 @@ class TypeRestriction:
 
         assert typespec, "Unknown node: {0}".format(node)
 
-        try:
-            assert isinstance(node, typespec), \
-                "Invalid node type: {0} should be: {1}" \
-                    .format(type(node), typespec)
-        except AssertionError:
-            if catch_asserts:
-                if node is not None:
-                    setattr(node, "_decompilation_error_here", True)
-                print("-- WARNING: Error occurred during decompilation.")
-                print("--   Code may be incomplete or incorrect.")
-            else:
-                raise
+        # try:
+        #     assert isinstance(node, typespec), \
+        #         "Invalid node type: {0} should be: {1}" \
+        #             .format(type(node), typespec)
+        # except AssertionError:
+        #     if catch_asserts:
+        #         if node is not None:
+        #             setattr(node, "_decompilation_error_here", True)
+        #         print("-- WARNING: Error occurred during decompilation.")
+        #         print("--   Code may be incomplete or incorrect.")
+        #     else:
+        #         raise
 
 
 STATEMENT_TYPES = (

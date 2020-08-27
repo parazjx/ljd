@@ -67,7 +67,7 @@ def _fill_massive_refs(info, simple, massive, iterators):
     if isinstance(holder, nodes.Assignment):
         dst = holder.destinations.contents[0]
 
-        assert len(info.references) == 2
+        # assert len(info.references) == 2
         orig = info.references[0].identifier
 
         assignment = ref.path[-3]
@@ -151,7 +151,7 @@ def _eliminate_simple_cases(simple):
         else:
             found = _replace_node(holder, dst, src)
 
-        assert found
+        # assert found
 
 
 def _eliminate_into_table_constructors(tables):
