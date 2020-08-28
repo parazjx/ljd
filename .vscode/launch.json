@@ -9,7 +9,7 @@
             "type": "python",
             "request": "launch",
             "program": "main.py",
-            "args": ["-f", "./test/3_Skill.lua.lua", "-o", "./test/PVPRole.lua.lua"],
+            "args": ["-r", "./assets", "-d", "./assets_out"],
             "console": "integratedTerminal"
         }
     ]

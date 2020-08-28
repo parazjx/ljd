@@ -28,6 +28,7 @@ import os
 import sys
 from datetime import datetime
 from optparse import OptionParser
+import progressbar
 
 
 def dump(name, obj, level=0):
@@ -166,7 +167,7 @@ class Main:
             logger.addHandler(console)
         else:
             logger = None
-
+        
         # Recursive batch processing
         if self.options.folder_name:
             if self.options.version_config_list != "version_default":
@@ -176,11 +177,19 @@ class Main:
                     logger.info("Exit")
                 return 0
 
+            total_file_num = 0
+            for path, _, filenames in os.walk(self.options.folder_name):
+                for file in filenames:
+                    if file.endswith('.lua'):
+                        total_file_num = total_file_num + 1
+            bar = progressbar.ProgressBar(0, total_file_num)
+            file_count = 0
+
             for path, _, filenames in os.walk(self.options.folder_name):
                 for file in filenames:
                     if file.endswith('.lua'):
                         full_path = os.path.join(path, file)
-
+                        file_count = file_count + 1
                         if self.options.enable_logging:
                             logger.info(full_path)
                         try:
@@ -191,14 +200,20 @@ class Main:
                             self.write_file(new_path)
                             if self.options.enable_logging:
                                 logger.info("Success")
+                            else:
+                                bar.update(file_count)
                         except KeyboardInterrupt:
                             if self.options.enable_logging:
                                 logger.info("Exit")
+                            else:
+                                bar.update(file_count)
                             return 0
                         except:
                             if self.options.enable_logging:
                                 logger.info("Exception")
                                 logger.debug('', exc_info=True)
+                            else:
+                                bar.update(file_count)
 
             return 0
 
