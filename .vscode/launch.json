@@ -5,11 +5,25 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python: 当前文件",
+            "type": "python",
+            "cwd": "${workspaceFolder}",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
             "name": "Python: main",
             "type": "python",
             "request": "launch",
+            "cwd": "${workspaceFolder}",
             "program": "main.py",
-            "args": ["-r", "./assets", "-d", "./assets_out"],
+            "args": [
+                "-L",
+                "2020-08-20",
+                "-C",
+                "2020-08-29"
+            ],
             "console": "integratedTerminal"
         }
     ]

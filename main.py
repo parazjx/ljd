@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: UTF-8 -*- 
 #
 # The MIT License (MIT)
 #
@@ -26,9 +27,15 @@
 import logging
 import os
 import sys
+import hashlib
+import operator
+import platform
+import time
+from shutil import copyfile
 from datetime import datetime
 from optparse import OptionParser
 import progressbar
+from xxteafile import xxteaFile
 
 
 def dump(name, obj, level=0):
@@ -92,10 +99,20 @@ class Main:
                           type="string", dest="folder_name", default="",
                           help="recursively decompile lua files", metavar="FOLDER")
 
+        # Directory in which to recurse and process all files. Not to be used with -f and -r
+        parser.add_option("-L", "--last",
+                          type="string", dest="last_date", default="",
+                          help="last decrypt lua files date")
+
         # Directory to output processed files during recursion. Not to be used with -f
         parser.add_option("-d", "--dir_out",
                           type="string", dest="folder_output", default="",
                           help="directory to output decompiled lua scripts", metavar="FOLDER")
+        
+        # Directory to output processed files during recursion. Not to be used with -f and -d
+        parser.add_option("-C", "--current",
+                          type="string", dest="current_date", default="",
+                          help="current decrypt lua files date")
 
         # Global override of LuaJIT version, ignores -j
         parser.add_option("-j", "--jit_version",
@@ -168,6 +185,107 @@ class Main:
         else:
             logger = None
         
+        if self.options.current_date:
+            if not self.options.last_date:
+                 self.options.last_date = self.options.current_date
+            last_date_folder_name = os.path.abspath('../files/' + self.options.last_date + '/' + self.options.last_date)
+            last_date_folder_name_decrypt = os.path.abspath('../files/' + self.options.last_date + '/decrypt')
+            last_date_folder_name_decompile = os.path.abspath('../files/' + self.options.last_date + '/decompile')
+            curr_date_folder_name = os.path.abspath('../files/' + self.options.current_date + '/' + self.options.current_date)
+            curr_date_folder_name_decrypt = os.path.abspath('../files/' + self.options.current_date + '/decrypt')
+            curr_date_folder_name_decompile = os.path.abspath('../files/' + self.options.current_date + '/decompile')
+            if not os.path.exists(curr_date_folder_name_decrypt):
+                os.makedirs(curr_date_folder_name_decrypt)
+            if not os.path.exists(curr_date_folder_name_decompile):
+                os.makedirs(curr_date_folder_name_decompile)
+
+            for path, _, filenames in os.walk(last_date_folder_name_decompile):
+                for file in filenames:
+                    if file.endswith('.lua'):
+                        full_path = os.path.join(path, file)
+                        new_path = full_path.replace(last_date_folder_name_decompile, curr_date_folder_name_decompile)
+                        parent_path = os.path.dirname(new_path)
+                        if not os.path.exists(parent_path):
+                            os.makedirs(parent_path)
+                        copyfile(full_path, new_path)
+
+
+            total_file_num = 0
+            for path, _, filenames in os.walk(curr_date_folder_name):
+                for file in filenames:
+                    if file.endswith('.lua'):
+                        total_file_num = total_file_num + 1
+            bar = progressbar.ProgressBar(0, total_file_num)
+            file_count = 0
+            # generate file list
+            file_list = []
+            print("Decrypting...")
+            for path, _, filenames in os.walk(curr_date_folder_name):
+                for file in filenames:
+                        if file.endswith('.lua'):
+                            full_path = os.path.join(path, file)
+                            releate_path = path.replace(curr_date_folder_name, "")
+                            last_path = path.replace(curr_date_folder_name, last_date_folder_name)
+                            last_full_path = os.path.join(last_path, file)
+                            last_decompile_file_path = os.path.join(last_date_folder_name_decompile + releate_path, file)
+                            curr_decompile_file_path = os.path.join(curr_date_folder_name_decompile + releate_path, file)
+                            if self.file_compare(full_path, last_full_path) and os.path.isfile(last_decompile_file_path):
+                                parent_path = os.path.dirname(curr_decompile_file_path)
+                                if not os.path.exists(parent_path):
+                                    os.makedirs(parent_path)
+                                copyfile(last_decompile_file_path, curr_decompile_file_path)
+                            else:
+                                decrypt_file_path = os.path.join(curr_date_folder_name_decrypt + releate_path, file)
+                                decrypt = xxteaFile(full_path, decrypt_file_path)
+                                file_list.append(decrypt_file_path)
+                            file_count = file_count + 1
+                            bar.update(file_count)
+            bar.finish()
+            print("Decompling...")
+            total_file_num = len(file_list)
+            bar = progressbar.ProgressBar(0, total_file_num)
+            fail_count = 0
+            file_count = 0
+            for file in file_list:
+                if file.endswith('.lua'):
+                    full_path = file
+                    file_count = file_count + 1
+                    if self.options.enable_logging:
+                        logger.info(full_path)
+                    try:
+                        self.decompile(full_path)
+                        new_path = full_path.replace(curr_date_folder_name_decrypt, curr_date_folder_name_decompile)
+                        parent_path = os.path.dirname(new_path)
+                        if not os.path.exists(parent_path):
+                            os.makedirs(parent_path)
+                        self.write_file(new_path)
+                        if self.options.enable_logging:
+                            logger.info("Success")
+                        else:
+                            bar.update(file_count)
+                    except KeyboardInterrupt:
+                        if self.options.enable_logging:
+                            logger.info("Exit")
+                        else:
+                            bar.update(file_count)
+                        return 0
+                    except:
+                        fail_count = fail_count + 1
+                        new_path = full_path.replace(curr_date_folder_name_decrypt, curr_date_folder_name_decompile)
+                        parent_path = os.path.dirname(new_path)
+                        if not os.path.exists(parent_path):
+                            os.makedirs(parent_path)
+                        self.decompile_luajit(full_path, new_path)
+                        if self.options.enable_logging:
+                            logger.info("Exception")
+                            logger.debug('', exc_info=True)
+                        else:
+                            bar.update(file_count)
+            bar.finish()
+            print("New file(s): " + str(total_file_num) + ". Including " + str(fail_count) + " file(s) decompiled by luajit")         
+            return 0      
+
+
         # Recursive batch processing
         if self.options.folder_name:
             if self.options.version_config_list != "version_default":
@@ -232,6 +350,57 @@ class Main:
 
         return 0
 
+    def decompile_luajit(self, file_in, file_out):
+        file1_dec_name = os.path.abspath('./luajit/test.lua')
+        file1_temp_name = os.path.abspath('./luajit/test.asm')
+        file2_dec_name = os.path.abspath('./luajit/out.lua')
+        file2_com_name = os.path.abspath('./luajit/out2.lua')
+        if os.path.exists(file1_dec_name):
+            os.remove(file1_dec_name)
+        if os.path.exists(file1_temp_name):
+            os.remove(file1_temp_name)
+        if os.path.exists(file2_dec_name):
+            os.remove(file2_dec_name)
+        if os.path.exists(file2_com_name):
+            os.remove(file2_com_name)
+        copyfile(file_in, os.path.abspath("./luajit/test.lua"))
+        sys_platform = platform.system()
+        time.sleep(0.01)
+        retval = os.getcwd()
+        os.chdir(os.path.abspath('./luajit'))
+        if sys_platform == "Windows":
+            os.system(os.path.abspath('./decoder_new.exe'))
+        elif sys_platform == "Linux":
+            os.system(os.path.abspath('./luajit -blg test.lua out2.lua'))
+        try_time = 0
+        os.chdir(retval)
+        while not os.path.exists(file2_com_name):
+            try_time = try_time + 1
+            if try_time > 2000:
+                break
+            time.sleep(0.001)
+        if os.path.exists(file2_com_name):
+            copyfile(file2_dec_name, file_out)
+
+    def get_file_md5(self, file_path):
+        f = open(file_path, 'rb')
+        md5_obj = hashlib.md5()
+        with open(file_path,'rb') as f_obj:
+            while True:
+                data = f_obj.read(4096)
+                if not data:
+                    break
+                md5_obj.update(data)
+        return str(md5_obj.hexdigest()).lower()
+
+    def file_compare(self, file1, file2):
+        file1_md5 = self.get_file_md5(file1)
+        file2_md5 = self.get_file_md5(file2)
+        if operator.eq(file1_md5, file2_md5):
+            return True
+        else:
+            return False
+    
     def write_file(self, file_name):
         with open(file_name, "w", encoding="utf8") as out_file:
             self.ljd.lua.writer.write(out_file, self.ast)
@@ -317,6 +486,7 @@ class Main:
     def set_version_config(version_number):
         import ljd.config.version_config
         ljd.config.version_config.use_version = version_number
+
 
 
 if __name__ == "__main__":
