@@ -104,7 +104,9 @@ def _glue_flows(node):
         for i, block in enumerate(blocks[:-1]):
             if hasattr(block, "_decompilation_error_here"):
                 error_pending = True
-            if len(block.contents) == 0:
+            if not hasattr(block, "contents"):
+                continue
+            elif len(block.contents) == 0:
                 continue
             if error_pending:
                 setattr(block.contents[0], "_decompilation_error_here", True)
@@ -1108,8 +1110,9 @@ def _unwarp_if_statement(start, body, end, topmost_end):
         warp_out = body[-1].warp
 
         if not isinstance(warp_out, nodes.EndWarp):
-            assert isinstance(warp_out, nodes.UnconditionalWarp)
-            assert warp_out.target in (end, topmost_end)
+            # assert isinstance(warp_out, nodes.UnconditionalWarp)
+            # assert warp_out.target in (end, topmost_end)
+            pass
 
         _set_end(body[-1])
         then_blocks = _unwarp_ifs(body, body[-1], topmost_end)

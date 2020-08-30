@@ -1,5 +1,9 @@
 *.lua[co]
 *.py[cod]
+assets/
+assets_out/
+test/
+logs/
 
 # C extensions
 *.so
@@ -36,3 +40,4 @@ nosetests.xml
 .project
 .pydevproject
 .*.swp
+xxteafile/key.py

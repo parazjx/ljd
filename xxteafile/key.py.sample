@@ -1,0 +1,3 @@
+SIGN = 'SIGN' # replace sign here
+SIGN_LEN = len(SIGN)
+KEY = "KEY" # replace key here
