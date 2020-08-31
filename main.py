@@ -201,7 +201,7 @@ class Main:
 
             for path, _, filenames in os.walk(last_date_folder_name_decompile):
                 for file in filenames:
-                    if file.endswith('.lua'):
+                    if file.endswith('.lua') or file.endswith('.luac'):
                         full_path = os.path.join(path, file)
                         new_path = full_path.replace(last_date_folder_name_decompile, curr_date_folder_name_decompile)
                         parent_path = os.path.dirname(new_path)
@@ -213,7 +213,7 @@ class Main:
             total_file_num = 0
             for path, _, filenames in os.walk(curr_date_folder_name):
                 for file in filenames:
-                    if file.endswith('.lua'):
+                    if file.endswith('.lua') or file.endswith('.luac'):
                         total_file_num = total_file_num + 1
             bar = progressbar.ProgressBar(0, total_file_num)
             file_count = 0
@@ -222,7 +222,7 @@ class Main:
             print("Decrypting...")
             for path, _, filenames in os.walk(curr_date_folder_name):
                 for file in filenames:
-                        if file.endswith('.lua'):
+                        if file.endswith('.lua') or file.endswith('.luac'):
                             full_path = os.path.join(path, file)
                             releate_path = path.replace(curr_date_folder_name, "")
                             last_path = path.replace(curr_date_folder_name, last_date_folder_name)
@@ -247,7 +247,7 @@ class Main:
             fail_count = 0
             file_count = 0
             for file in file_list:
-                if file.endswith('.lua'):
+                if file.endswith('.lua') or file.endswith('.luac'):
                     full_path = file
                     file_count = file_count + 1
                     if self.options.enable_logging:
@@ -298,14 +298,14 @@ class Main:
             total_file_num = 0
             for path, _, filenames in os.walk(self.options.folder_name):
                 for file in filenames:
-                    if file.endswith('.lua'):
+                    if file.endswith('.lua') or file.endswith('.luac'):
                         total_file_num = total_file_num + 1
             bar = progressbar.ProgressBar(0, total_file_num)
             file_count = 0
 
             for path, _, filenames in os.walk(self.options.folder_name):
                 for file in filenames:
-                    if file.endswith('.lua'):
+                    if file.endswith('.lua') or file.endswith('.luac'):
                         full_path = os.path.join(path, file)
                         file_count = file_count + 1
                         if self.options.enable_logging:

@@ -41,3 +41,7 @@ nosetests.xml
 .pydevproject
 .*.swp
 xxteafile/key.py
+luajit/out.lua
+luajit/out2.lua
+luajit/test.asm
+luajit/test.lua
