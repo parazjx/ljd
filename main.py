@@ -383,6 +383,8 @@ class Main:
             copyfile(file2_dec_name, file_out)
 
     def get_file_md5(self, file_path):
+        if not os.path.isfile(file_path):
+            return ""
         f = open(file_path, 'rb')
         md5_obj = hashlib.md5()
         with open(file_path,'rb') as f_obj:
