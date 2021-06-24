@@ -436,18 +436,23 @@ class Visitor(traverse.Visitor):
     # ##
 
     def visit_identifier(self, node):
+        placeholder_identifier = "slot{0}"
         if node.type == nodes.Identifier.T_SLOT:
-            placeholder_identifier = "slot{0}"
-
             # Fix placeholder slots before writing
             if node.slot == SLOT_FALSE:
                 placeholder_identifier = "false"
             elif node.slot == SLOT_TRUE:
                 placeholder_identifier = "true"
 
-            self._write(placeholder_identifier, node.slot)
+            self._write(placeholder_identifier, node.slot+node.upvalues_count)
         else:
-            self._write(node.name)
+            if node.name:
+                self._write(node.name)
+            else:
+                if node.type == nodes.Identifier.T_SLOT:
+                    self._write(placeholder_identifier, node.slot+node.upvalues_count)
+                else:
+                    self._write(placeholder_identifier, node.slot)
 
     def visit_multres(self, node):
         self._write("MULTRES")
