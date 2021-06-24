@@ -15,7 +15,7 @@ def eliminate_temporary(ast):
     slots, unused = _collect_slots(ast)
     _eliminate_temporary(slots)
 
-    # _remove_unused(unused)
+    _recovery_invalid_nodes(ast)
 
     _cleanup_invalid_nodes(ast)
 
@@ -234,11 +234,6 @@ def _unmark_invalidated(node):
 
 def _is_invalidated(node):
     return getattr(node, "_invalidated", False)
-
-
-def _remove_unused(unused):
-    pass
-
 
 def _collect_slots(ast):
     collector = _SlotsCollector()
@@ -487,3 +482,131 @@ class _TreeCleanup(traverse.Visitor):
                 patched.append(subnode)
 
         node.contents = patched
+def _recovery_invalid_nodes(ast):
+    traverse.traverse(_TreeRecovery(), ast)
+
+class _TreeRecovery(traverse.Visitor):
+    def __init__(self):
+        super().__init__()
+        self._states = []
+        self._path = []
+        self._skip = None
+
+        self.slots = []
+        self.unused = []
+
+        self._push_state()
+
+    # ##
+
+    def _state(self):
+        return self._states[-1]
+
+    def _push_state(self):
+        self._states.append(_SlotsCollector._State())
+
+    def _pop_state(self):
+        self._states.pop()
+
+  
+
+
+
+
+    def _register_slot(self, slot, node):
+        
+
+        info = _SlotInfo()
+        info.slot = slot
+        info.assignment = node
+        info.function = self._state().function
+
+        self._state().known_slots[slot] = info
+
+    def _register_all_slots(self, node, slots):
+        for slot in slots:
+            if not isinstance(slot, nodes.Identifier):
+                continue
+
+            if slot.type != nodes.Identifier.T_SLOT:
+                continue
+
+            self._register_slot(slot.slot, node)
+
+
+
+    def _register_slot_reference(self, slot, node):
+        info = None
+        if node.type == nodes.Identifier.T_UPVALUE:
+            up_len = len(self._states)-1
+            while up_len>0:
+                up_len = up_len-1
+                info = self._states[up_len].known_slots.get(slot)
+                if info:
+                    break
+        else:
+            info = self._state().known_slots.get(slot)
+
+        if info is None:
+            return
+        if _is_invalidated(info.assignment):
+            _unmark_invalidated(info.assignment)
+            self._visit(info.assignment.expressions)
+        reference = _SlotReference()
+        reference.identifier = node
+
+        # Copy the list, but not contents
+        reference.path = self._path[:]
+
+        info.references.append(reference)
+
+    # ##
+
+    def visit_assignment(self, node):
+        self._visit(node.expressions)
+        self._skip = node.expressions
+
+        self._register_all_slots(node, node.destinations.contents)
+
+    def leave_assignment(self, node):
+        self._skip = None
+
+    def visit_identifier(self, node):
+        if node.type == nodes.Identifier.T_SLOT or node.type == nodes.Identifier.T_UPVALUE:
+            if not isinstance(self._path[-2],nodes.VariablesList):
+                uplen = len(self._path)-2
+                while uplen>0:
+                    if isinstance(self._path[uplen],nodes.Assignment):
+                        if _is_invalidated(self._path[uplen]):
+                            return
+                    uplen=uplen-1
+                self._register_slot_reference(node.slot, node)
+                    
+
+    # ##
+
+    def visit_function_definition(self, node):
+        self._push_state()
+        self._state().function = node
+
+    def leave_function_definition(self, node):
+        self._pop_state()
+
+    def leave_block(self, node):
+        self._state().known_slots = {}
+    # ##
+
+    def _visit_node(self, handler, node):
+        self._path.append(node)
+
+        traverse.Visitor._visit_node(self, handler, node)
+
+    def _leave_node(self, handler, node):
+        self._path.pop()
+        traverse.Visitor._leave_node(self, handler, node)
+
+    def _visit(self, node):
+        if self._skip == node:
+            return
+
+        traverse.Visitor._visit(self, node)
