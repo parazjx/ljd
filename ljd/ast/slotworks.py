@@ -15,7 +15,6 @@ def eliminate_temporary(ast):
     slots, unused = _collect_slots(ast)
     _eliminate_temporary(slots)
 
-    _eliminate_reference(ast)
     # _remove_unused(unused)
 
     _cleanup_invalid_nodes(ast)
@@ -317,7 +316,7 @@ class _SlotInfo:
         self.assignment = None
         self.references = []
         self.termination = None
-
+        self.referenceCount = 0
         self.function = None
 
 
@@ -399,11 +398,19 @@ class _SlotsCollector(traverse.Visitor):
             self._commit_slot(slot.slot, node)
 
     def _register_slot_reference(self, slot, node):
-        info = self._state().known_slots.get(slot)
+        info = None
+        if node.type == nodes.Identifier.T_UPVALUE:
+            up_len = len(self._states)-1
+            while up_len>0:
+                up_len = up_len-1
+                info = self._states[up_len].known_slots.get(slot)
+                if info:
+                    break
+        else:
+            info = self._state().known_slots.get(slot)
 
         if info is None:
             return
-
         reference = _SlotReference()
         reference.identifier = node
 
@@ -424,7 +431,7 @@ class _SlotsCollector(traverse.Visitor):
         self._skip = None
 
     def visit_identifier(self, node):
-        if node.type == nodes.Identifier.T_SLOT:
+        if node.type == nodes.Identifier.T_SLOT or node.type == nodes.Identifier.T_UPVALUE:
             self._register_slot_reference(node.slot, node)
 
     # ##
@@ -480,144 +487,3 @@ class _TreeCleanup(traverse.Visitor):
                 patched.append(subnode)
 
         node.contents = patched
-
-def _eliminate_reference(ast):
-    traverse.traverse(_PassReference(), ast)
-
-class _PassReference(traverse.Visitor):
-    # ##
-    def __init__(self):
-        super().__init__()
-        self._states = []
-        self.expressions = [False]
-        self.slots = []
-        self.invalidated = [False]
-        self._push_state()
-
-    # ##
-    def _state(self):
-        return self._states[-1]
-
-    def _push_state(self):
-        self._states.append(_SlotsCollector._State())
-
-    def _pop_state(self):
-        self._states.pop()
-
-    def _commit_info(self, info):
-        self.slots.append(info)
-
-    def _commit_slot(self, slot, node):
-        info = self._state().known_slots.get(slot)
-        if info is None:
-            return
-        info.termination = node
-        del self._state().known_slots[slot]
-
-        self._commit_info(info)
-
-    def _register_slot(self, slot, node):
-        if self.invalidated:
-            self._commit_slot(slot, node)
-            info = _SlotInfo()
-            info.slot = slot
-            info.assignment = node
-            info.function = self._state().function
-
-            self._state().known_slots[slot] = info
-
-    def _register_all_slots(self, node, slots):
-        for slot in slots:
-            if not isinstance(slot, nodes.Identifier):
-                continue
-
-            if slot.type != nodes.Identifier.T_SLOT:
-                continue
-
-            self._register_slot(slot.slot, node)
-
-    def _commit_all_slots(self, slots, node):
-        for slot in slots:
-            if not isinstance(slot, nodes.Identifier):
-                continue
-
-            self._commit_slot(slot.slot, node)
-
-    def _register_slot_reference(self, slot, node):
-        info = self._state().known_slots.get(slot)
-
-        if info is None:
-            return
-
-        reference = _SlotReference()
-        reference.identifier = node
-
-
-    # ##
-
-    def visit_assignment(self, node):
-        self.invalidated.append(_is_invalidated(node) ) 
-            
-        self._visit(node.expressions)
-        self._register_all_slots(node, node.destinations.contents)
-        
-
-    def leave_assignment(self, node):
-        self.invalidated.pop()
-
-
-    def visit_identifier(self, node):
-        if node.type == nodes.Identifier.T_SLOT:
-            self._register_slot_reference(node.slot, node)
-
-    # ##
-
-    def visit_function_definition(self, node):
-        self._push_state()
-        self._state().function = node
-
-    def leave_function_definition(self, node):
-        self._pop_state()
-
-    def leave_block(self, node):
-        for info in self._state().known_slots.values():
-            self._commit_info(info)
-
-        self._state().known_slots = {}
-
-    def visit_iterator_warp(self, node):
-        self._commit_all_slots(node.variables.contents, node)
-
-    def visit_numeric_loop_warp(self, node):
-        self._commit_slot(node.index.slot, node)
-
-    # ##
-
-    def _visit_node(self, handler, node):
-        traverse.Visitor._visit_node(self, handler, node)
-
-    def _leave_node(self, handler, node):
-        traverse.Visitor._leave_node(self, handler, node)
-
-    def _visit(self, node):
-        
-        if not self.invalidated[-1] and self.is_expressions():
-            if isinstance(node,nodes.Identifier):
-                    info = self._state().known_slots.get(node.slot)
-                    if info and _is_invalidated(info.assignment):
-                        _unmark_invalidated(info.assignment) 
-       
-        traverse.Visitor._visit(self, node)
-
-    def _visit_list(self, nodes_list):
-        assert isinstance(nodes_list, list)
-        for node in nodes_list:
-            self._visit(node)
-    def is_expressions(self):
-        return isinstance(self.expressions[-1],nodes.ExpressionsList) 
-        
-    def visit_expressions_list(self,node):
-        self.expressions.append(node)
-
-    def leave_expressions_list(self,node):
-        self.expressions.pop()
