@@ -147,9 +147,11 @@ def _eliminate_simple_cases(simple):
 
             if isinstance(holder, LIST_TYPES):
                 conts = holder.contents
-                found = _replace_node_in_list(conts, dst, src)
+               
+                if not (isinstance(holder,nodes.VariablesList) and isinstance(src,nodes.BinaryOperator)):
+                    _replace_node_in_list(conts, dst, src)
             else:
-                found = _replace_node(holder, dst, src)
+                _replace_node(holder, dst, src)
 
         # assert found
 
