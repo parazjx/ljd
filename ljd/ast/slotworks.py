@@ -142,14 +142,14 @@ def _eliminate_simple_cases(simple):
 
         if src is None:
             src = info.assignment.expressions.contents[0]
+        if not isinstance(src,nodes.TableConstructor):
+            _mark_invalidated(info.assignment)
 
-        _mark_invalidated(info.assignment)
-
-        if isinstance(holder, LIST_TYPES):
-            conts = holder.contents
-            found = _replace_node_in_list(conts, dst, src)
-        else:
-            found = _replace_node(holder, dst, src)
+            if isinstance(holder, LIST_TYPES):
+                conts = holder.contents
+                found = _replace_node_in_list(conts, dst, src)
+            else:
+                found = _replace_node(holder, dst, src)
 
         # assert found
 
@@ -196,8 +196,8 @@ def _replace_node_in_list(node_list, original, replacement):
         index = node_list.index(original)
     except ValueError:
         return False
-
-    node_list[index] = replacement
+    if not isinstance(replacement,nodes.TableConstructor):
+        node_list[index] = replacement
     return True
 
 
