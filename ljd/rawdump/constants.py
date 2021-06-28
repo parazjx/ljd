@@ -21,6 +21,8 @@ BCDUMP_KTAB_INT = 3
 BCDUMP_KTAB_NUM = 4
 BCDUMP_KTAB_STR = 5
 
+PROTO_UV_LOCAL = 0x8000
+PROTO_UV_IMMUTABLE = 0x4000
 
 def read(parser, constants):
     r = True
@@ -38,6 +40,10 @@ def _read_upvalue_references(parser, references):
     while i < parser.upvalues_count:
         i += 1
         upvalue = parser.stream.read_uint(2)
+        if upvalue&PROTO_UV_LOCAL:
+            upvalue = upvalue^PROTO_UV_LOCAL
+        if upvalue&PROTO_UV_IMMUTABLE:
+            upvalue = upvalue^PROTO_UV_IMMUTABLE
         references.append(upvalue)
 
     return True
