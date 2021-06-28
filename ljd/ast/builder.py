@@ -504,7 +504,7 @@ def _build_var_assignment(state, addr, instruction):
         expression = _build_const_expression(state, addr, instruction)
 
     elif opcode == ins.FNEW.opcode:
-        expression = _build_function(state, instruction.CD,destination.slot)
+        expression = _build_function(state, instruction.CD,destination.slot+destination.slot_index)
 
     elif opcode == ins.TNEW.opcode:
         expression = nodes.TableConstructor()
