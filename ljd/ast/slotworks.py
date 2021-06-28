@@ -381,8 +381,10 @@ class _SlotsCollector(traverse.Visitor):
         for slot in slots:
             if not isinstance(slot, nodes.Identifier):
                 continue
-
-            if slot.type != nodes.Identifier.T_SLOT:
+            if slot.type ==  nodes.Identifier.T_UPVALUE:
+                self._register_slot_reference(slot.slot,slot)
+                continue
+            elif slot.type != nodes.Identifier.T_SLOT:
                 continue
 
             self._register_slot(slot.slot, node)
@@ -509,11 +511,6 @@ class _TreeRecovery(traverse.Visitor):
 
     def _pop_state(self):
         self._states.pop()
-
-  
-
-
-
 
     def _register_slot(self, slot, node):
         
