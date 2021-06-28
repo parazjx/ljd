@@ -444,13 +444,13 @@ class Visitor(traverse.Visitor):
             elif node.slot == SLOT_TRUE:
                 placeholder_identifier = "true"
 
-            self._write(placeholder_identifier, node.slot)
+            self._write(placeholder_identifier, node.slot+node.upvalues_count)
         else:
             if node.name:
                 self._write(node.name)
             else:
                 if node.type == nodes.Identifier.T_SLOT:
-                    self._write(placeholder_identifier, node.slot)
+                    self._write(placeholder_identifier, node.slot+node.upvalues_count)
                 else:
                     self._write(placeholder_identifier, node.slot)
 

@@ -16,6 +16,7 @@ class _State:
         self.block = None
         self.blocks = []
         self.block_starts = {}
+        self.upvalues_count = 0
     def _warp_in_block(self, addr):
         block = self.block_starts[addr]
         block.warpins_count += 1
@@ -33,6 +34,7 @@ def _build_function_definition(prototype):
 
     state.constants = prototype.constants
     state.debuginfo = prototype.debuginfo
+    state.upvalues_count = len(prototype.constants.upvalue_references)
     node._upvalues = prototype.constants.upvalue_references
     node._debuginfo = prototype.debuginfo
     node._instructions_count = len(prototype.instructions)
@@ -929,6 +931,7 @@ def _build_identifier(state, addr, slot, want_type):
 
     node.slot = slot
     node.type = nodes.Identifier.T_SLOT
+    node.upvalues_count = state.upvalues_count
     if want_type == nodes.Identifier.T_UPVALUE:
         name = state.debuginfo.lookup_upvalue_name(slot)
         if name is not None:
