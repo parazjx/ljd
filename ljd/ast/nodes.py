@@ -235,7 +235,6 @@ class Identifier:
         self.name = None
         self.type = -1
         self.slot = -1
-        self.upvalues_count = 0
         self._varinfo = None
 
     def _accept(self, visitor):
