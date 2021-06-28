@@ -300,7 +300,8 @@ class Main:
                 for file in filenames:
                     if file.endswith('.lua') or file.endswith('.luac'):
                         total_file_num = total_file_num + 1
-            bar = progressbar.ProgressBar(0, total_file_num)
+            bar = progressbar.ProgressBar(total_file_num)
+            bar.start()
             file_count = 0
 
             for path, _, filenames in os.walk(self.options.folder_name):
