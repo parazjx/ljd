@@ -429,7 +429,7 @@ class Main:
         self.ljd.ast.locals.mark_locals(self.ast)
 
         # self.ljd.ast.validator.validate(self.ast, warped=True)
-
+        self.ljd.ast.slotworks.eliminate_upvalue(self.ast)
         try:
             self.ljd.ast.slotworks.eliminate_temporary(self.ast)
         except:

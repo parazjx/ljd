@@ -938,6 +938,7 @@ def _build_identifier(state, addr, slot, want_type):
         if name is not None:
             node.name = name
         node.type = want_type
+        node.slot_index = -1
         node.slot = state.constants.upvalue_references[slot]
     return node
 
