@@ -669,7 +669,7 @@ class _TreeUpvalue(traverse.Visitor):
                 if info is None:
                     if self._states[up_len].function:
                         for arg in self._states[up_len].function.arguments.contents:
-                            if arg.slot == slot:
+                            if isinstance(arg,nodes.Identifier) and arg.slot == slot:
                                 node.slot_index = arg.slot_index
                                 return
                 if info:
