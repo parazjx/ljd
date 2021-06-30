@@ -381,8 +381,10 @@ class _SlotsCollector(traverse.Visitor):
         for slot in slots:
             if not isinstance(slot, nodes.Identifier):
                 continue
-
-            if slot.type != nodes.Identifier.T_SLOT:
+            if slot.type ==  nodes.Identifier.T_UPVALUE:
+                self._register_slot_reference(slot.slot,slot)
+                continue
+            elif slot.type != nodes.Identifier.T_SLOT:
                 continue
 
             self._register_slot(slot.slot, node)
@@ -510,11 +512,6 @@ class _TreeRecovery(traverse.Visitor):
     def _pop_state(self):
         self._states.pop()
 
-  
-
-
-
-
     def _register_slot(self, slot, node):
         
 
@@ -605,6 +602,125 @@ class _TreeRecovery(traverse.Visitor):
 
     def _leave_node(self, handler, node):
         self._path.pop()
+        traverse.Visitor._leave_node(self, handler, node)
+
+    def _visit(self, node):
+        if self._skip == node:
+            return
+
+        traverse.Visitor._visit(self, node)
+def eliminate_upvalue(ast):
+    traverse.traverse(_TreeUpvalue(), ast)
+
+class _TreeUpvalue(traverse.Visitor):
+    # ##
+
+    def __init__(self):
+        super().__init__()
+        self._states = []
+        self._path = []
+        self._skip = None
+        self._push_state()
+
+    # ##
+
+    def _state(self):
+        return self._states[-1]
+
+    def _push_state(self):
+        self._states.append(_SlotsCollector._State())
+
+    def _pop_state(self):
+        self._states.pop()
+
+    def _register_slot(self, slot, node):
+
+        info = _SlotInfo()
+        info.slot = slot
+        info.assignment = node
+        info.function = self._state().function
+       
+        self._state().known_slots[slot] = info
+
+    def _register_all_slots(self, node, slots):
+        for slot in slots:
+            if not isinstance(slot, nodes.Identifier):
+                continue
+            if slot.type ==  nodes.Identifier.T_UPVALUE:
+                self._register_slot_reference(slot.slot,slot)
+                continue
+            elif slot.type != nodes.Identifier.T_SLOT:
+                continue
+
+            self._register_slot(slot.slot, slot)
+
+    def _register_slot_reference(self, slot, node):
+        info = None
+        
+        if node.type == nodes.Identifier.T_UPVALUE:
+            up_len = len(self._states)-1
+            while up_len>0:
+                up_len = up_len-1
+                info = self._states[up_len].known_slots.get(slot)
+                if info is None:
+                    if self._states[up_len].function:
+                        for arg in self._states[up_len].function.arguments.contents:
+                            if arg.slot == slot:
+                                node.slot_index = arg.slot_index
+                                return
+                if info:
+                    node.slot_index = info.assignment.slot_index
+                    break
+        else:
+            info = self._state().known_slots.get(slot)
+
+        if info is None:
+            return
+        reference = _SlotReference()
+        reference.identifier = node
+
+        # Copy the list, but not contents
+        reference.path = self._path[:]
+
+        info.references.append(reference)
+
+    # ##
+
+    def visit_assignment(self, node):
+        self._visit(node.expressions)
+        self._skip = node.expressions
+
+        self._register_all_slots(node, node.destinations.contents)
+
+    def leave_assignment(self, node):
+        self._skip = None
+
+    def visit_identifier(self, node):
+        if node.type == nodes.Identifier.T_SLOT or node.type == nodes.Identifier.T_UPVALUE:
+            self._register_slot_reference(node.slot, node)
+
+    # ##
+
+    def visit_function_definition(self, node):
+        self._push_state()
+        self._state().function = node
+
+    def leave_function_definition(self, node):
+        self._pop_state()
+
+    def leave_block(self, node):
+        self._state().known_slots = {}
+
+    # ##
+
+    def _visit_node(self, handler, node):
+        self._path.append(node)
+
+        traverse.Visitor._visit_node(self, handler, node)
+
+    def _leave_node(self, handler, node):
+        self._path.pop()
+
         traverse.Visitor._leave_node(self, handler, node)
 
     def _visit(self, node):

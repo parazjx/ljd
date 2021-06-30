@@ -16,7 +16,7 @@ class _State:
         self.block = None
         self.blocks = []
         self.block_starts = {}
-        self.upvalues_count = 0
+        self.slot_index = 0
     def _warp_in_block(self, addr):
         block = self.block_starts[addr]
         block.warpins_count += 1
@@ -24,17 +24,17 @@ class _State:
 
 
 def build(prototype):
-    return _build_function_definition(prototype)
+    return _build_function_definition(prototype,0)
 
 
-def _build_function_definition(prototype):
+def _build_function_definition(prototype,slot_index):
     node = nodes.FunctionDefinition()
 
     state = _State()
 
     state.constants = prototype.constants
     state.debuginfo = prototype.debuginfo
-    state.upvalues_count = len(prototype.constants.upvalue_references)
+    state.slot_index = slot_index
     node._upvalues = prototype.constants.upvalue_references
     node._debuginfo = prototype.debuginfo
     node._instructions_count = len(prototype.instructions)
@@ -464,6 +464,15 @@ def _build_var_assignment(state, addr, instruction):
 
     assignment = nodes.Assignment()
 
+    if instruction.A_type == ins.T_DST:
+        destination = _build_slot(state, addr, instruction.A)
+    else:
+        assert instruction.A_type == ins.T_UV
+
+        destination = _build_upvalue(state, addr, instruction.A)
+
+    assignment.destinations.contents.append(destination)
+
     # Unary assignment operators (A = op D)
     if opcode == ins.MOV.opcode \
             or opcode == ins.NOT.opcode \
@@ -495,7 +504,7 @@ def _build_var_assignment(state, addr, instruction):
         expression = _build_const_expression(state, addr, instruction)
 
     elif opcode == ins.FNEW.opcode:
-        expression = _build_function(state, instruction.CD)
+        expression = _build_function(state, instruction.CD,destination.slot+destination.slot_index)
 
     elif opcode == ins.TNEW.opcode:
         expression = nodes.TableConstructor()
@@ -516,14 +525,7 @@ def _build_var_assignment(state, addr, instruction):
 
     assignment.expressions.contents.append(expression)
 
-    if instruction.A_type == ins.T_DST:
-        destination = _build_slot(state, addr, instruction.A)
-    else:
-        assert instruction.A_type == ins.T_UV
-
-        destination = _build_upvalue(state, addr, instruction.A)
-
-    assignment.destinations.contents.append(destination)
+    
 
     return assignment
 
@@ -784,10 +786,9 @@ def _build_table_element(state, addr, instruction):
     return node
 
 
-def _build_function(state, slot):
+def _build_function(state, slot,slotindex):
     prototype = state.constants.complex_constants[slot]
-
-    return _build_function_definition(prototype)
+    return _build_function_definition(prototype,slotindex+1)
 
 
 def _build_table_copy(state, slot):
@@ -931,13 +932,14 @@ def _build_identifier(state, addr, slot, want_type):
 
     node.slot = slot
     node.type = nodes.Identifier.T_SLOT
-    node.upvalues_count = state.upvalues_count
+    node.slot_index = state.slot_index
     if want_type == nodes.Identifier.T_UPVALUE:
         name = state.debuginfo.lookup_upvalue_name(slot)
         if name is not None:
             node.name = name
         node.type = want_type
-    
+        node.slot_index = -1
+        node.slot = state.constants.upvalue_references[slot]
     return node
 
 
