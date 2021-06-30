@@ -149,6 +149,10 @@ def _eliminate_simple_cases(simple):
                 conts = holder.contents
                
                 if not (isinstance(holder,nodes.VariablesList) and isinstance(src,nodes.BinaryOperator)):
+                    if isinstance(src,nodes.FunctionDefinition):
+                        if len(info.references)>2:
+                            _unmark_invalidated(info.assignment)
+                            continue
                     _replace_node_in_list(conts, dst, src)
             else:
                 _replace_node(holder, dst, src)
