@@ -609,10 +609,10 @@ class _TreeRecovery(traverse.Visitor):
         traverse.Visitor._leave_node(self, handler, node)
 
     def _visit(self, node):
-        if self._skip == node:
+        if self._skip == node or isinstance(node,nodes.FunctionCall) or isinstance(node,nodes.BinaryOperator) :
             return
-
         traverse.Visitor._visit(self, node)
+
 def eliminate_upvalue(ast):
     traverse.traverse(_TreeUpvalue(), ast)
 
