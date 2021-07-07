@@ -97,10 +97,6 @@ def _glue_flows(node):
 
     for statements in _gather_statements_lists(node):
         blocks = statements.contents
-
-        # TODO(yzg): 'Return' object has no attribute 'contents'
-        assert isinstance(blocks[-1], nodes.Return) or isinstance(blocks[-1].warp, nodes.EndWarp)
-
         for i, block in enumerate(blocks[:-1]):
             if hasattr(block, "_decompilation_error_here"):
                 error_pending = True

@@ -5,7 +5,7 @@
 
 import ljd.ast.nodes as nodes
 import ljd.ast.traverse as traverse
-
+import ljd.bytecode.debuginfo as debuginfo
 
 def mark_locals(ast):
     traverse.traverse(_LocalsMarker(), ast)
@@ -148,10 +148,13 @@ class _LocalDefinitionsMarker(traverse.Visitor):
 
     def _update_known_locals(self, local, addr):
         varinfo = self._state().known_locals[local.slot]
-
-        self._state().known_locals[local.slot] = getattr(local,
-                                                         "_varinfo",
-                                                         None)
+        _varinfo = getattr(local,"_varinfo",None)
+        if _varinfo is None:
+            _varinfo = debuginfo.VariableInfo()
+            _varinfo.start_addr = addr
+            _varinfo.end_addr = 0xFFFFFF
+        
+        self._state().known_locals[local.slot] = _varinfo
 
         if varinfo is None:
             return False
@@ -202,20 +205,17 @@ class _LocalDefinitionsMarker(traverse.Visitor):
         if not isinstance(dst, nodes.Identifier):
             return
 
-        if dst.type != nodes.Identifier.T_LOCAL:
+        if dst.type != nodes.Identifier.T_LOCAL and dst.type != nodes.Identifier.T_SLOT :
             return
 
         known_slot = self._update_known_locals(dst, addr)
-
         for slot in node.destinations.contents[1:]:
             if not isinstance(slot, nodes.Identifier):
                 return
-
-            if slot.type != nodes.Identifier.T_LOCAL:
+            if slot.type != nodes.Identifier.T_LOCAL and dst.type != nodes.Identifier.T_SLOT :
                 return
 
             also_known = self._update_known_locals(slot, addr)
-
             assert known_slot == also_known
 
         if not known_slot:

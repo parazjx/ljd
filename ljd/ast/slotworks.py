@@ -149,6 +149,10 @@ def _eliminate_simple_cases(simple):
                 conts = holder.contents
                
                 if not (isinstance(holder,nodes.VariablesList) and isinstance(src,nodes.BinaryOperator)):
+                    if isinstance(src,nodes.FunctionDefinition):
+                        if len(info.references)>2:
+                            _unmark_invalidated(info.assignment)
+                            continue
                     _replace_node_in_list(conts, dst, src)
             else:
                 _replace_node(holder, dst, src)
@@ -605,10 +609,10 @@ class _TreeRecovery(traverse.Visitor):
         traverse.Visitor._leave_node(self, handler, node)
 
     def _visit(self, node):
-        if self._skip == node:
+        if self._skip == node or isinstance(node,nodes.FunctionCall) or isinstance(node,nodes.BinaryOperator) :
             return
-
         traverse.Visitor._visit(self, node)
+
 def eliminate_upvalue(ast):
     traverse.traverse(_TreeUpvalue(), ast)
 
@@ -665,7 +669,7 @@ class _TreeUpvalue(traverse.Visitor):
                 if info is None:
                     if self._states[up_len].function:
                         for arg in self._states[up_len].function.arguments.contents:
-                            if arg.slot == slot:
+                            if isinstance(arg,nodes.Identifier) and arg.slot == slot:
                                 node.slot_index = arg.slot_index
                                 return
                 if info:
